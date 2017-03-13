@@ -17,7 +17,7 @@ public class DateFormatUtils {
      * The format used is {@code yyyy-MM-dd'T'HH:mm:ss}.
      */
     public static final FastDateFormat ISO_DATETIME_FORMAT
-            = FastDateFormat.getInstance("yyyy-MM-dd'T'HH:mm:ss");
+            = FastDateFormat.getInstance("yyyy-MM-dd'T'HH:mm:ss'Z'");
 
     /**
      * ISO 8601 formatter for date-time with time zone.

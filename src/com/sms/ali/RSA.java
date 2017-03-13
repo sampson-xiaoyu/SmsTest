@@ -4,17 +4,38 @@ package com.sms.ali;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
+import java.security.InvalidKeyException;
 import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 
 import javax.crypto.Cipher;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+import com.sms.ali.BasicCoder.Hmac;
 
 public class RSA{
 	
 	public static final String  SIGN_ALGORITHMS = "SHA1WithRSA";
+	
+	public static String signHmac(String content, String privateKey , String encode) throws NoSuchAlgorithmException, InvalidKeyException{
+		Mac mac = Mac.getInstance(Hmac.HmacSHA1.toString());
+		SecretKeySpec spec = null;
+		try {
+			spec = new SecretKeySpec(privateKey.getBytes(encode), Hmac.HmacSHA1.toString());
+			mac.init(spec);
+			return Base64.encode(mac.doFinal(content.getBytes(encode)));
+		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			throw new RuntimeException("UTF-8 not supported.");
+		}
+		
+	}
 	
 	/**
 	* RSA签名

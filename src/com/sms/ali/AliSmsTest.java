@@ -6,55 +6,57 @@ import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.net.URLEncoder;
-import java.util.ArrayList;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 import com.easycode.commons.time.DateFormatUtils;
 
 public class AliSmsTest {
 	
+	private final static String SEPARATOR = "&";
 	
 	public static void main(String arg[]){
-		
-		String url = AliSmsConfig.url;
-		String ret = "";
-		
+
 		try {
-			url = url + prepareParams();
-			ret = AliSmsTest.get(url, 100);
+			String url = AliSmsConfig.url;
+			System.out.println("url:"+url);
+			String ret = AliSmsTest.post(url,prepareParams(), 100);
+			System.out.println(ret);
 		} catch (UnsupportedEncodingException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
-		
-		System.out.println(ret);
+		}	
 	}
 	
-	public static String get(String url,int timeOut) throws IOException {
-		System.out.println("url:"+url);
+	public static String post(String url,String params,int timeOut) throws IOException {
+
 		String ret = "";	
         	String inputLine;
         HttpPost request = new HttpPost(url);
+        request.setHeader("Content-Type", "application/x-www-form-urlencoded");
+        HttpEntity entity = new StringEntity(params);
+        request.setEntity(entity);
      // 创建HttpClient实例
      	HttpClient httpclient = new DefaultHttpClient();
      	HttpResponse response = httpclient.execute(request);
-     	HttpEntity entity = response.getEntity();
-     	BufferedReader in = new BufferedReader(new InputStreamReader(entity.getContent()));
+     	HttpEntity responseEntity = response.getEntity();
+     	BufferedReader in = new BufferedReader(new InputStreamReader(responseEntity.getContent()));
 		while ((inputLine = in.readLine()) != null) {
 			ret = ret + inputLine;
 		}
@@ -64,15 +66,14 @@ public class AliSmsTest {
 	
 	public static String prepareParams()  throws UnsupportedEncodingException{
 		
-		DateFormatUtils.ISO_DATETIME_TIME_ZONE_FORMAT.format(getCurrentUtcTime());
-		String timeStamp = DateFormatUtils.ISO_DATETIME_TIME_ZONE_FORMAT.format(getCurrentUtcTime());
+		String timeStamp = DateFormatUtils.ISO_DATETIME_FORMAT.format(getCurrentUtcTime());
 		System.out.println(timeStamp);
 		Map<String,String> param = new HashMap<String,String>();
 		param.put("Action", AliSmsConfig.smsAction);
 		param.put("SignName", AliSmsConfig.signName);
-		param.put("TemplateCode", "SMS_1595010");
-		param.put("RecNum", URLEncoder.encode("15820462420,18210609475",AliSmsConfig.input_charset));
-		param.put("ParamString", URLEncoder.encode("{\"no\":\"123456\"}",AliSmsConfig.input_charset));
+		param.put("TemplateCode", "SMS_111111");
+		param.put("RecNum", "15820462420");
+		param.put("ParamString", "{\"name\":\"123\"}");
 		param.put("Format", "JSON");
 		param.put("Version","2016-09-27");
 		param.put("AccessKeyId", AliSmsConfig.accessKeyId);
@@ -80,13 +81,24 @@ public class AliSmsTest {
 		param.put("SignatureVersion", AliSmsConfig.signatureVersion);		
 		param.put("SignatureMethod", AliSmsConfig.signatureMethod);
 		param.put("SignatureNonce", UUID.randomUUID().toString());
+		param.put("RegionId", "cn-hangzhou");
 		
-		String data= createLinkString(param);
+		String stringToSign = composeStringToSign("POST",param);
+		
+		System.out.println("签名前的stringToSign："+stringToSign);
 		//将待签名字符串使用私钥签名。
-        String rsa_sign= URLEncoder.encode(RSA.sign(data, AliSmsConfig.accessKeySecret, AliSmsConfig.input_charset),AliSmsConfig.input_charset);
+        String rsaSign = "";
+		try {
+			rsaSign = RSA.signHmac(stringToSign, AliSmsConfig.accessKeySecret+"&",AliSmsConfig.input_charset);
+		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} 
         
-        data=data+"&Signature="+rsa_sign;
+        param.put("Signature", rsaSign);
+        String data = concatQueryString(param);
         
+        System.out.println("签名后的data："+data);
         return data;
 	}
 	
@@ -104,25 +116,54 @@ public class AliSmsTest {
         return mills;
 	}
 	
-	private static String createLinkString(Map<String, String> params) {
-
-        List<String> keys = new ArrayList<String>(params.keySet());
-        Collections.sort(keys);
-
-        String prestr = "";
-
-        for (int i = 0; i < keys.size(); i++) {
-            String key = keys.get(i);
-            String value = params.get(key);
-
-            if (i == keys.size() - 1) {//拼接时，不包括最后一个&字符
-                prestr = prestr + key + "=" +value;
-            } else {
-                prestr = prestr + key + "=" +value + "&";
-            }
+	public static String concatQueryString(Map<String, String> parameters) 
+			throws UnsupportedEncodingException {
+		if (null == parameters)
+			return null;
+		
+		StringBuilder urlBuilder = new StringBuilder("");
+		for(Entry<String, String> entry : parameters.entrySet()){
+            String key = entry.getKey();
+            String val = entry.getValue();
+			urlBuilder.append(AcsURLEncoder.encode(key));
+			if (val != null){
+            	urlBuilder.append("=").append(AcsURLEncoder.encode(val));
+			}
+			urlBuilder.append("&");
         }
-
-        return prestr;
-    }
+		
+		int strIndex = urlBuilder.length();
+		if (parameters.size() > 0)
+			urlBuilder.deleteCharAt(strIndex - 1);
+		
+		return urlBuilder.toString();
+	}
+	
+	public static String composeStringToSign(String method, Map<String, String> queries) {
+		
+		String[] sortedKeys = queries.keySet().toArray(new String[]{});
+        Arrays.sort(sortedKeys);
+        StringBuilder canonicalizedQueryString = new StringBuilder();
+        try { 
+	        for(String key : sortedKeys) {
+	            canonicalizedQueryString.append("&")
+	            .append(AcsURLEncoder.percentEncode(key)).append("=")
+	            .append(AcsURLEncoder.percentEncode(queries.get(key)));
+	        }
+	
+	        StringBuilder stringToSign = new StringBuilder();
+	        stringToSign.append(method);
+	        stringToSign.append(SEPARATOR);
+	        stringToSign.append(AcsURLEncoder.percentEncode("/"));
+	        stringToSign.append(SEPARATOR);
+	        stringToSign.append(AcsURLEncoder.percentEncode(
+	                canonicalizedQueryString.toString().substring(1)));
+	        
+	        return stringToSign.toString();
+        } catch (UnsupportedEncodingException exp) {
+        	throw new RuntimeException("UTF-8 encoding is not supported.");
+        }
+        
+	}
 	
 }
