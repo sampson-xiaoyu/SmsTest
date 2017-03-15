@@ -71,9 +71,9 @@ public class AliSmsTest {
 		Map<String,String> param = new HashMap<String,String>();
 		param.put("Action", AliSmsConfig.smsAction);
 		param.put("SignName", AliSmsConfig.signName);
-		param.put("TemplateCode", "SMS_111111");
+		param.put("TemplateCode", AliSmsConfig.validateTemplateCode);
 		param.put("RecNum", "15820462420");
-		param.put("ParamString", "{\"name\":\"123\"}");
+		param.put("ParamString", "{\"code\":\"12356\"}");
 		param.put("Format", "JSON");
 		param.put("Version","2016-09-27");
 		param.put("AccessKeyId", AliSmsConfig.accessKeyId);
